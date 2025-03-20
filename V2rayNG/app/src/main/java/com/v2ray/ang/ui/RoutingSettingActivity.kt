@@ -12,7 +12,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.tbruyelle.rxpermissions3.RxPermissions
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityRoutingSettingBinding
@@ -39,6 +38,16 @@ class RoutingSettingActivity : BaseActivity() {
     private val preset_rulesets: Array<out String> by lazy {
         resources.getStringArray(R.array.preset_rulesets)
     }
+    
+    private val requestCameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            scanQRcodeForRulesets.launch(Intent(this, ScannerActivity::class.java))
+        } else {
+            toast(R.string.toast_permission_denied)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +57,7 @@ class RoutingSettingActivity : BaseActivity() {
 
         binding.recyclerView.setHasFixedSize(true)
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
+        addCustomDividerToRecyclerView(binding.recyclerView, this, R.drawable.custom_divider)
         binding.recyclerView.adapter = adapter
 
         mItemTouchHelper = ItemTouchHelper(SimpleItemTouchHelperCallback(adapter))
@@ -102,11 +112,9 @@ class RoutingSettingActivity : BaseActivity() {
                             e.printStackTrace()
                         }
                     }.show()
-
-
                 }
                 .setNegativeButton(android.R.string.cancel) { _, _ ->
-                    //do noting
+                    //do nothing
                 }
                 .show()
             true
@@ -142,17 +150,9 @@ class RoutingSettingActivity : BaseActivity() {
         }
 
         R.id.import_rulesets_from_qrcode -> {
-            RxPermissions(this)
-                .request(Manifest.permission.CAMERA)
-                .subscribe {
-                    if (it)
-                        scanQRcodeForRulesets.launch(Intent(this, ScannerActivity::class.java))
-                    else
-                        toast(R.string.toast_permission_denied)
-                }
+            requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             true
         }
-
 
         R.id.export_rulesets_to_clipboard -> {
             val rulesetList = MmkvManager.decodeRoutingRulesets()
@@ -201,5 +201,4 @@ class RoutingSettingActivity : BaseActivity() {
         rulesets.addAll(MmkvManager.decodeRoutingRulesets() ?: mutableListOf())
         adapter.notifyDataSetChanged()
     }
-
 }

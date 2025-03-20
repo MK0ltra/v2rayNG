@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.AngApplication.Companion.application
 import com.v2ray.ang.AppConfig
@@ -23,9 +24,8 @@ import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
 import com.v2ray.ang.service.V2RayServiceManager
 import com.v2ray.ang.util.Utils
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.core.Observable
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainRecyclerAdapter(val activity: MainActivity) : RecyclerView.Adapter<MainRecyclerAdapter.BaseViewHolder>(), ItemTouchHelperAdapter {
     companion object {
@@ -83,7 +83,7 @@ class MainRecyclerAdapter(val activity: MainActivity) : RecyclerView.Adapter<Mai
                 }
             }
 
-            // 隐藏主页服务器地址为xxx:xxx:***/xxx.xxx.xxx.***
+            // Hide xxx:xxx:***/xxx.xxx.xxx.***
             val strState = "${
                 profile.server?.let {
                     if (it.contains(":"))
@@ -164,18 +164,20 @@ class MainRecyclerAdapter(val activity: MainActivity) : RecyclerView.Adapter<Mai
                     }
                     notifyItemChanged(mActivity.mainViewModel.getPosition(guid))
                     if (isRunning) {
-                        Utils.stopVService(mActivity)
-                        Observable.timer(500, TimeUnit.MILLISECONDS)
-                            .observeOn(AndroidSchedulers.mainThread())
-                            .subscribe {
-                                V2RayServiceManager.startV2Ray(mActivity)
+                        V2RayServiceManager.stopVService(mActivity)
+                        mActivity.lifecycleScope.launch {
+                            try {
+                                delay(500)
+                                V2RayServiceManager.startVService(mActivity)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
                             }
+                        }
                     }
                 }
             }
         }
         if (holder is FooterViewHolder) {
-            //if (activity?.defaultDPreference?.getPrefBoolean(AppConfig.PREF_INAPP_BUY_IS_PREMIUM, false)) {
             if (true) {
                 holder.itemFooterBinding.layoutEdit.visibility = View.INVISIBLE
             } else {
