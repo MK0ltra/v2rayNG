@@ -168,7 +168,7 @@ object SpeedtestManager {
 
     fun getRemoteIPInfo(): String? {
         val httpPort = SettingsManager.getHttpPort()
-        var content = HttpUtil.getUrlContent(AppConfig.IP_API_URL, 5000, httpPort) ?: return null
+        var content = HttpUtil.getUrlContentWithReferer(AppConfig.IP_API_URL, 5000, httpPort) ?: return null
 
         var ipInfo = JsonUtil.fromJson(content, IPAPIInfo::class.java) ?: return null
         var ip = ipInfo.ip ?: ipInfo.clientIp ?: ipInfo.ip_addr ?: ipInfo.query
