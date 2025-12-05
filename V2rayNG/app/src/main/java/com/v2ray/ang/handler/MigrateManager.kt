@@ -3,14 +3,13 @@ package com.v2ray.ang.handler
 import android.util.Log
 import com.tencent.mmkv.MMKV
 import com.v2ray.ang.AppConfig
-import com.v2ray.ang.AppConfig.ANG_PACKAGE
 import com.v2ray.ang.dto.EConfigType
 import com.v2ray.ang.dto.NetworkType
 import com.v2ray.ang.dto.ProfileItem
 import com.v2ray.ang.dto.ServerConfig
+import com.v2ray.ang.extension.removeWhiteSpace
 import com.v2ray.ang.handler.MmkvManager.decodeServerConfig
 import com.v2ray.ang.util.JsonUtil
-import com.v2ray.ang.util.Utils
 
 object MigrateManager {
     private const val ID_SERVER_CONFIG = "SERVER_CONFIG"
@@ -26,7 +25,7 @@ object MigrateManager {
             return false
         }
         val serverList = serverStorage.allKeys() ?: return false
-        Log.d(ANG_PACKAGE, "migrateServerConfig2Profile-" + serverList.count())
+        Log.i(AppConfig.TAG, "migrateServerConfig2Profile-" + serverList.count())
 
         for (guid in serverList) {
             var configOld = decodeServerConfigOld(guid) ?: continue
@@ -43,9 +42,9 @@ object MigrateManager {
             //check and remove old
             decodeServerConfig(guid) ?: continue
             serverStorage.remove(guid)
-            Log.d(ANG_PACKAGE, "migrateServerConfig2Profile-" + config.remarks)
+            Log.i(AppConfig.TAG, "migrateServerConfig2Profile-" + config.remarks)
         }
-        Log.d(ANG_PACKAGE, "migrateServerConfig2Profile-end")
+        Log.i(AppConfig.TAG, "migrateServerConfig2Profile-end")
         return true
     }
 
@@ -109,7 +108,7 @@ object MigrateManager {
         config.insecure = tlsSettings?.allowInsecure
         config.sni = tlsSettings?.serverName
         config.fingerPrint = tlsSettings?.fingerprint
-        config.alpn = Utils.removeWhiteSpace(tlsSettings?.alpn?.joinToString(",")).toString()
+        config.alpn = tlsSettings?.alpn?.joinToString(",").removeWhiteSpace().toString()
 
         config.publicKey = tlsSettings?.publicKey
         config.shortId = tlsSettings?.shortId
@@ -172,10 +171,10 @@ object MigrateManager {
 
         outbound.settings?.let { wireguard ->
             config.secretKey = wireguard.secretKey
-            config.localAddress = Utils.removeWhiteSpace((wireguard.address as List<*>).joinToString(",")).toString()
+            config.localAddress = (wireguard.address as List<*>).joinToString(",").removeWhiteSpace().toString()
             config.publicKey = wireguard.peers?.getOrNull(0)?.publicKey
             config.mtu = wireguard.mtu
-            config.reserved = Utils.removeWhiteSpace(wireguard.reserved?.joinToString(",")).toString()
+            config.reserved = wireguard.reserved?.joinToString(",").removeWhiteSpace().toString()
         }
         return config
     }
@@ -199,7 +198,7 @@ object MigrateManager {
         outbound.streamSettings?.tlsSettings?.let { tlsSetting ->
             config.insecure = tlsSetting.allowInsecure
             config.sni = tlsSetting.serverName
-            config.alpn = Utils.removeWhiteSpace(tlsSetting.alpn?.joinToString(",")).orEmpty()
+            config.alpn = tlsSetting.alpn?.joinToString(",").removeWhiteSpace().orEmpty()
 
         }
         config.obfsPassword = outbound.settings?.obfsPassword

@@ -1,6 +1,7 @@
 package com.v2ray.ang.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
@@ -8,11 +9,10 @@ import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
-import android.text.TextUtils
+import android.util.Log
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -23,8 +23,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.navigation.NavigationView
 import com.google.android.material.tabs.TabLayout
 import com.v2ray.ang.AppConfig
@@ -33,19 +33,18 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityMainBinding
 import com.v2ray.ang.dto.EConfigType
 import com.v2ray.ang.extension.toast
+import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MigrateManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.helper.SimpleItemTouchHelperCallback
-import com.v2ray.ang.service.V2RayServiceManager
-import com.v2ray.ang.util.HttpUtil
+import com.v2ray.ang.handler.V2RayServiceManager
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import me.drakeet.support.toast.ToastCompat
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     private val binding by lazy {
@@ -87,13 +86,13 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                 when (pendingAction) {
                     Action.IMPORT_QR_CODE_CONFIG ->
                         scanQRCodeForConfig.launch(Intent(this, ScannerActivity::class.java))
-                    Action.IMPORT_QR_CODE_URL ->
-                        scanQRCodeForUrlToCustomConfig.launch(Intent(this, ScannerActivity::class.java))
+
                     Action.READ_CONTENT_FROM_URI ->
                         chooseFileForCustomConfig.launch(Intent.createChooser(Intent(Intent.ACTION_GET_CONTENT).apply {
                             type = "*/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }, getString(R.string.title_file_chooser)))
+
                     Action.POST_NOTIFICATIONS -> {}
                     else -> {}
                 }
@@ -108,7 +107,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     enum class Action {
         NONE,
         IMPORT_QR_CODE_CONFIG,
-        IMPORT_QR_CODE_URL,
         READ_CONTENT_FROM_URI,
         POST_NOTIFICATIONS
     }
@@ -123,12 +121,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     private val scanQRCodeForConfig = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == RESULT_OK) {
             importBatchConfig(it.data?.getStringExtra("SCAN_RESULT"))
-        }
-    }
-
-    private val scanQRCodeForUrlToCustomConfig = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (it.resultCode == RESULT_OK) {
-            importConfigCustomUrl(it.data?.getStringExtra("SCAN_RESULT"))
         }
     }
 
@@ -162,7 +154,11 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         }
 
         binding.recyclerView.setHasFixedSize(true)
-        binding.recyclerView.layoutManager = LinearLayoutManager(this)
+        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_DOUBLE_COLUMN_DISPLAY, false)) {
+            binding.recyclerView.layoutManager = GridLayoutManager(this, 2)
+        } else {
+            binding.recyclerView.layoutManager = GridLayoutManager(this, 1)
+        }
         addCustomDividerToRecyclerView(binding.recyclerView, this, R.drawable.custom_divider)
         binding.recyclerView.adapter = adapter
 
@@ -200,6 +196,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         })
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     private fun setupViewModel() {
         mainViewModel.updateListAction.observe(this) { index ->
             if (index >= 0) {
@@ -265,7 +262,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         binding.tabGroup.isVisible = true
     }
 
-    fun startV2Ray() {
+    private fun startV2Ray() {
         if (MmkvManager.getSelectServer().isNullOrEmpty()) {
             toast(R.string.title_file_chooser)
             return
@@ -273,7 +270,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         V2RayServiceManager.startVService(this)
     }
 
-    fun restartV2Ray() {
+    private fun restartV2Ray() {
         if (mainViewModel.isRunning.value == true) {
             V2RayServiceManager.stopVService(this)
         }
@@ -317,12 +314,17 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
         R.id.import_qrcode -> {
-            importQRcode(true)
+            importQRcode()
             true
         }
 
         R.id.import_clipboard -> {
             importClipboard()
+            true
+        }
+
+        R.id.import_local -> {
+            importConfigLocal()
             true
         }
 
@@ -366,44 +368,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             true
         }
 
-        R.id.import_config_custom_clipboard -> {
-            importConfigCustomClipboard()
-            true
-        }
-
-        R.id.import_config_custom_local -> {
-            importConfigCustomLocal()
-            true
-        }
-
-        R.id.import_config_custom_url -> {
-            importConfigCustomUrlClipboard()
-            true
-        }
-
-        R.id.import_config_custom_url_scan -> {
-            importQRcode(false)
-            true
-        }
-
-        R.id.sub_update -> {
-            importConfigViaSub()
-            true
-        }
-
         R.id.export_all -> {
-            binding.pbWaiting.show()
-            lifecycleScope.launch(Dispatchers.IO) {
-                val ret = mainViewModel.exportAllServer()
-                launch(Dispatchers.Main) {
-                    if (ret > 0)
-                        toast(getString(R.string.title_export_config_count, ret))
-                    else
-                        toast(R.string.toast_failure)
-                    binding.pbWaiting.hide()
-                }
-            }
-
+            exportAll()
             true
         }
 
@@ -419,82 +385,44 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             true
         }
 
+        R.id.intelligent_selection_all -> {
+            if (MmkvManager.decodeSettingsString(AppConfig.PREF_OUTBOUND_DOMAIN_RESOLVE_METHOD, "1") != "0") {
+                toast(getString(R.string.pre_resolving_domain))
+            }
+            mainViewModel.createIntelligentSelectionAll()
+            true
+        }
+
         R.id.service_restart -> {
             restartV2Ray()
             true
         }
 
         R.id.del_all_config -> {
-            AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    binding.pbWaiting.show()
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        val ret = mainViewModel.removeAllServer()
-                        launch(Dispatchers.Main) {
-                            mainViewModel.reloadServerList()
-                            toast(getString(R.string.title_del_config_count, ret))
-                            binding.pbWaiting.hide()
-                        }
-                    }
-                }
-                .setNegativeButton(android.R.string.cancel) { _, _ ->
-                    //do noting
-                }
-                .show()
+            delAllConfig()
             true
         }
 
         R.id.del_duplicate_config -> {
-            AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    binding.pbWaiting.show()
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        val ret = mainViewModel.removeDuplicateServer()
-                        launch(Dispatchers.Main) {
-                            mainViewModel.reloadServerList()
-                            toast(getString(R.string.title_del_duplicate_config_count, ret))
-                            binding.pbWaiting.hide()
-                        }
-                    }
-                }
-                .setNegativeButton(android.R.string.cancel) { _, _ ->
-                    //do noting
-                }
-                .show()
+            delDuplicateConfig()
             true
         }
 
         R.id.del_invalid_config -> {
-            AlertDialog.Builder(this).setMessage(R.string.del_invalid_config_comfirm)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    binding.pbWaiting.show()
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        val ret = mainViewModel.removeInvalidServer()
-                        launch(Dispatchers.Main) {
-                            mainViewModel.reloadServerList()
-                            toast(getString(R.string.title_del_config_count, ret))
-                            binding.pbWaiting.hide()
-                        }
-                    }
-                }
-                .setNegativeButton(android.R.string.cancel) { _, _ ->
-                    //do noting
-                }
-                .show()
+            delInvalidConfig()
             true
         }
 
         R.id.sort_by_test_results -> {
-            binding.pbWaiting.show()
-            lifecycleScope.launch(Dispatchers.IO) {
-                mainViewModel.sortByTestResults()
-                launch(Dispatchers.Main) {
-                    mainViewModel.reloadServerList()
-                    binding.pbWaiting.hide()
-                }
-            }
+            sortByTestResults()
             true
         }
+
+        R.id.sub_update -> {
+            importConfigViaSub()
+            true
+        }
+
 
         else -> super.onOptionsItemSelected(item)
     }
@@ -511,16 +439,12 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     /**
      * import config from qrcode
      */
-    private fun importQRcode(forConfig: Boolean): Boolean {
+    private fun importQRcode(): Boolean {
         val permission = Manifest.permission.CAMERA
         if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
-            if (forConfig) {
-                scanQRCodeForConfig.launch(Intent(this, ScannerActivity::class.java))
-            } else {
-                scanQRCodeForUrlToCustomConfig.launch(Intent(this, ScannerActivity::class.java))
-            }
+            scanQRCodeForConfig.launch(Intent(this, ScannerActivity::class.java))
         } else {
-            pendingAction = if (forConfig) Action.IMPORT_QR_CODE_CONFIG else Action.IMPORT_QR_CODE_URL
+            pendingAction = Action.IMPORT_QR_CODE_CONFIG
             requestPermissionLauncher.launch(permission)
         }
         return true
@@ -535,7 +459,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             val clipboard = Utils.getClipboard(this)
             importBatchConfig(clipboard)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(AppConfig.TAG, "Failed to import config from clipboard", e)
             return false
         }
         return true
@@ -556,91 +480,33 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                         }
 
                         countSub > 0 -> initGroupTab()
-                        else -> toast(R.string.toast_failure)
+                        else -> toastError(R.string.toast_failure)
                     }
                     binding.pbWaiting.hide()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    toast(R.string.toast_failure)
+                    toastError(R.string.toast_failure)
                     binding.pbWaiting.hide()
                 }
-                e.printStackTrace()
+                Log.e(AppConfig.TAG, "Failed to import batch config", e)
             }
-        }
-    }
-
-
-    private fun importConfigCustomClipboard()
-            : Boolean {
-        try {
-            val configText = Utils.getClipboard(this)
-            if (TextUtils.isEmpty(configText)) {
-                toast(R.string.toast_none_data_clipboard)
-                return false
-            }
-            importCustomizeConfig(configText)
-            return true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return false
         }
     }
 
     /**
      * import config from local config file
      */
-    private fun importConfigCustomLocal(): Boolean {
+    private fun importConfigLocal(): Boolean {
         try {
             showFileChooser()
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(AppConfig.TAG, "Failed to import config from local file", e)
             return false
         }
         return true
     }
 
-    private fun importConfigCustomUrlClipboard()
-            : Boolean {
-        try {
-            val url = Utils.getClipboard(this)
-            if (TextUtils.isEmpty(url)) {
-                toast(R.string.toast_none_data_clipboard)
-                return false
-            }
-            return importConfigCustomUrl(url)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return false
-        }
-    }
-
-    /**
-     * import config from url
-     */
-    private fun importConfigCustomUrl(url: String?): Boolean {
-        try {
-            if (!Utils.isValidUrl(url)) {
-                toast(R.string.toast_invalid_url)
-                return false
-            }
-            lifecycleScope.launch(Dispatchers.IO) {
-                val configText = try {
-                    HttpUtil.getUrlContentWithUserAgent(url)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    ""
-                }
-                launch(Dispatchers.Main) {
-                    importCustomizeConfig(configText)
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return false
-        }
-        return true
-    }
 
     /**
      * import config from sub
@@ -656,12 +522,94 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                     toast(getString(R.string.title_update_config_count, count))
                     mainViewModel.reloadServerList()
                 } else {
-                    toast(R.string.toast_failure)
+                    toastError(R.string.toast_failure)
                 }
                 binding.pbWaiting.hide()
             }
         }
         return true
+    }
+
+    private fun exportAll() {
+        binding.pbWaiting.show()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val ret = mainViewModel.exportAllServer()
+            launch(Dispatchers.Main) {
+                if (ret > 0)
+                    toast(getString(R.string.title_export_config_count, ret))
+                else
+                    toastError(R.string.toast_failure)
+                binding.pbWaiting.hide()
+            }
+        }
+    }
+
+    private fun delAllConfig() {
+        AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                binding.pbWaiting.show()
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val ret = mainViewModel.removeAllServer()
+                    launch(Dispatchers.Main) {
+                        mainViewModel.reloadServerList()
+                        toast(getString(R.string.title_del_config_count, ret))
+                        binding.pbWaiting.hide()
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                //do noting
+            }
+            .show()
+    }
+
+    private fun delDuplicateConfig() {
+        AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                binding.pbWaiting.show()
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val ret = mainViewModel.removeDuplicateServer()
+                    launch(Dispatchers.Main) {
+                        mainViewModel.reloadServerList()
+                        toast(getString(R.string.title_del_duplicate_config_count, ret))
+                        binding.pbWaiting.hide()
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                //do noting
+            }
+            .show()
+    }
+
+    private fun delInvalidConfig() {
+        AlertDialog.Builder(this).setMessage(R.string.del_invalid_config_comfirm)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                binding.pbWaiting.show()
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val ret = mainViewModel.removeInvalidServer()
+                    launch(Dispatchers.Main) {
+                        mainViewModel.reloadServerList()
+                        toast(getString(R.string.title_del_config_count, ret))
+                        binding.pbWaiting.hide()
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                //do noting
+            }
+            .show()
+    }
+
+    private fun sortByTestResults() {
+        binding.pbWaiting.show()
+        lifecycleScope.launch(Dispatchers.IO) {
+            mainViewModel.sortByTestResults()
+            launch(Dispatchers.Main) {
+                mainViewModel.reloadServerList()
+                binding.pbWaiting.hide()
+            }
+        }
     }
 
     /**
@@ -699,36 +647,13 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
             try {
                 contentResolver.openInputStream(uri).use { input ->
-                    importCustomizeConfig(input?.bufferedReader()?.readText())
+                    importBatchConfig(input?.bufferedReader()?.readText())
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(AppConfig.TAG, "Failed to read content from URI", e)
             }
         } else {
             requestPermissionLauncher.launch(permission)
-        }
-    }
-
-    /**
-     * import customize config
-     */
-    private fun importCustomizeConfig(server: String?) {
-        try {
-            if (server == null || TextUtils.isEmpty(server)) {
-                toast(R.string.toast_none_data)
-                return
-            }
-            if (mainViewModel.appendCustomConfigServer(server)) {
-                mainViewModel.reloadServerList()
-                toast(R.string.toast_success)
-            } else {
-                toast(R.string.toast_failure)
-            }
-            //adapter.notifyItemInserted(mainViewModel.serverList.lastIndex)
-        } catch (e: Exception) {
-            ToastCompat.makeText(this, "${getString(R.string.toast_malformed_josn)} ${e.cause?.message}", Toast.LENGTH_LONG).show()
-            e.printStackTrace()
-            return
         }
     }
 
@@ -757,34 +682,21 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         // Handle navigation view item clicks here.
         when (item.itemId) {
-            R.id.sub_setting -> {
-                requestSubSettingActivity.launch(Intent(this, SubSettingActivity::class.java))
-            }
+            R.id.sub_setting -> requestSubSettingActivity.launch(Intent(this, SubSettingActivity::class.java))
+            R.id.per_app_proxy_settings -> startActivity(Intent(this, PerAppProxyActivity::class.java))
+            R.id.routing_setting -> requestSubSettingActivity.launch(Intent(this, RoutingSettingActivity::class.java))
+            R.id.user_asset_setting -> startActivity(Intent(this, UserAssetActivity::class.java))
+            R.id.settings -> startActivity(
+                Intent(this, SettingsActivity::class.java)
+                    .putExtra("isRunning", mainViewModel.isRunning.value == true)
+            )
 
-            R.id.settings -> {
-                startActivity(
-                    Intent(this, SettingsActivity::class.java)
-                        .putExtra("isRunning", mainViewModel.isRunning.value == true)
-                )
-            }
-
-            R.id.routing_setting -> {
-                requestSubSettingActivity.launch(Intent(this, RoutingSettingActivity::class.java))
-            }
-
-
-            R.id.promotion -> {
-                Utils.openUri(this, "${Utils.decode(AppConfig.PromotionUrl)}?t=${System.currentTimeMillis()}")
-            }
-
-            R.id.logcat -> {
-                startActivity(Intent(this, LogcatActivity::class.java))
-            }
-
-            R.id.about -> {
-                startActivity(Intent(this, AboutActivity::class.java))
-            }
+            R.id.promotion -> Utils.openUri(this, "${Utils.decode(AppConfig.APP_PROMOTION_URL)}?t=${System.currentTimeMillis()}")
+            R.id.logcat -> startActivity(Intent(this, LogcatActivity::class.java))
+            R.id.check_for_update -> startActivity(Intent(this, CheckUpdateActivity::class.java))
+            R.id.about -> startActivity(Intent(this, AboutActivity::class.java))
         }
+
         binding.drawerLayout.closeDrawer(GravityCompat.START)
         return true
     }

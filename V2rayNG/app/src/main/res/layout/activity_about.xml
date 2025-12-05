@@ -47,7 +47,7 @@
                         android:id="@+id/tv_backup_summary"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/margin_spacing_dp16"
+                        android:layout_marginTop="@dimen/padding_spacing_dp16"
                         android:maxLines="4"
                         android:textAppearance="@style/TextAppearance.AppCompat.Small" />
 
@@ -58,7 +58,7 @@
             <LinearLayout
                 android:id="@+id/layout_share"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/view_height_dp72"
+                android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
@@ -82,7 +82,7 @@
             <LinearLayout
                 android:id="@+id/layout_restore"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/view_height_dp72"
+                android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
@@ -114,7 +114,7 @@
             <LinearLayout
                 android:id="@+id/layout_soure_ccode"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/view_height_dp72"
+                android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
@@ -138,7 +138,7 @@
             <LinearLayout
                 android:id="@+id/layout_oss_licenses"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/view_height_dp72"
+                android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
@@ -162,7 +162,7 @@
             <LinearLayout
                 android:id="@+id/layout_feedback"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/view_height_dp72"
+                android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
@@ -187,7 +187,7 @@
             <LinearLayout
                 android:id="@+id/layout_tg_channel"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/view_height_dp72"
+                android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
@@ -211,7 +211,7 @@
             <LinearLayout
                 android:id="@+id/layout_privacy_policy"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/view_height_dp72"
+                android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
@@ -234,13 +234,20 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/view_height_dp72"
+                android:layout_height="wrap_content"
                 android:gravity="center"
-                android:orientation="horizontal"
+                android:orientation="vertical"
                 android:padding="@dimen/padding_spacing_dp16">
 
                 <TextView
                     android:id="@+id/tv_version"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/title_about"
+                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+
+                <TextView
+                    android:id="@+id/tv_app_id"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/title_about"

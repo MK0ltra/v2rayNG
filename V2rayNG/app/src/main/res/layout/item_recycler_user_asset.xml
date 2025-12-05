@@ -8,18 +8,17 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="@dimen/margin_spacing_dp8"
         android:background="?attr/selectableItemBackground"
         android:gravity="center"
         android:orientation="horizontal"
-        android:padding="@dimen/margin_spacing_dp8">
+        android:padding="@dimen/padding_spacing_dp8">
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:paddingStart="@dimen/padding_spacing_dp16">
+            android:padding="@dimen/padding_spacing_dp8">
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -46,7 +45,6 @@
                     android:layout_height="wrap_content"
                     android:lines="1"
                     android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                    android:textSize="12sp"
                     tools:text="1MB . 2020.01.01" />
 
 
@@ -61,7 +59,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
-            android:padding="@dimen/margin_spacing_dp8">
+            android:padding="@dimen/padding_spacing_dp8">
 
             <ImageView
                 android:layout_width="@dimen/image_size_dp24"
@@ -76,7 +74,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
-            android:padding="@dimen/margin_spacing_dp8">
+            android:padding="@dimen/padding_spacing_dp8">
 
             <ImageView
                 android:layout_width="@dimen/image_size_dp24"
