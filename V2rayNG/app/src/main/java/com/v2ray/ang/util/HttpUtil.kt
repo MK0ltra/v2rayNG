@@ -174,20 +174,20 @@ object HttpUtil {
      * @param httpPort The HTTP port to use.
      * @return The content of the URL as a string.
      */
-fun getUrlContentWithReferer(url: String, timeout: Int, httpPort: Int = 0): String? {
-    val conn = createProxyConnection(url, httpPort, timeout, timeout) ?: return null
-    
-    // Add the Referer header
-    conn.setRequestProperty("Referer", "https://speed.cloudflare.com/")
-    
-    try {
-        return conn.inputStream.bufferedReader().readText()
-    } catch (_: Exception) {
-    } finally {
-        conn.disconnect()
+    fun getUrlContentWithReferer(url: String, timeout: Int, httpPort: Int = 0): String? {
+        val conn = createProxyConnection(url, httpPort, timeout, timeout) ?: return null
+        
+        // Add the Referer header
+        conn.setRequestProperty("Referer", "https://speed.cloudflare.com/")
+        
+        try {
+            return conn.inputStream.bufferedReader().readText()
+        } catch (_: Exception) {
+        } finally {
+            conn.disconnect()
+        }
+        return null
     }
-    return null
-}
 
     /**
      * Creates an HttpURLConnection object connected through a proxy.
